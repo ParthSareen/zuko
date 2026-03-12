@@ -32,10 +32,16 @@ zuko: blocked "gh issue create" — not in allowlist
 curl -sSfL https://raw.githubusercontent.com/ParthSareen/zuko/main/install.sh | sh
 ```
 
-Or with Go:
+Or with Go (requires `~/go/bin` on your PATH):
 
 ```bash
 go install github.com/ParthSareen/zuko@latest
+```
+
+If `~/go/bin` isn't on your PATH, add this to your shell rc (`~/.zshrc` or `~/.bashrc`):
+
+```bash
+export PATH="$HOME/go/bin:$PATH"
 ```
 
 ## Setup
