@@ -162,8 +162,9 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 
 | Command | Description |
 |---------|-------------|
+| Command | Description |
+|---------|-------------|
 | `zuko setup` | Discover binaries, create shim symlinks, write config |
-| `zuko teardown` | Remove shim symlinks |
 | `zuko init shell` | Prepend shim dir to PATH in shell rc |
 | `zuko init openclaw` | Merge zuko settings into openclaw.json |
 | `zuko add` | Add a new CLI tool to the sandbox (requires auth) |
@@ -171,6 +172,10 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 | `zuko config` | Edit allowlist config (requires auth) |
 | `zuko unlock` | Temporarily allow all commands (requires auth) |
 | `zuko lock` | Revoke unlock session |
+| `zuko teardown` | Remove shim symlinks |
+| `zuko teardown shell` | Remove zuko PATH block from shell rc |
+| `zuko teardown openclaw` | Remove zuko settings from openclaw.json |
+| `zuko teardown all` | Remove shims + undo shell and openclaw init |
 
 ## Platforms
 

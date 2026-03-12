@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
 	"github.com/ParthSareen/zuko/shim"
 	"github.com/spf13/cobra"
@@ -15,11 +16,26 @@ func init() {
 
 var teardownCmd = &cobra.Command{
 	Use:   "teardown",
-	Short: "Remove shim symlinks",
-	RunE:  runTeardown,
+	Short: "Remove zuko shims and undo init changes",
+	Long: `Remove zuko shims and optionally undo init changes.
+
+Running bare 'zuko teardown' removes shim symlinks only.
+
+Subcommands:
+  shell      Remove the zuko PATH block from your shell rc file
+  openclaw   Remove zuko settings from openclaw.json
+  all        Remove shims and undo both shell and openclaw init`,
+	RunE: runTeardown,
 }
 
 func runTeardown(_ *cobra.Command, _ []string) error {
+	if err := auth.PromptAndVerifyPassword(); err != nil {
+		return err
+	}
+	return removeShims()
+}
+
+func removeShims() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -34,7 +50,5 @@ func runTeardown(_ *cobra.Command, _ []string) error {
 		}
 		fmt.Printf("removed shim for %s\n", name)
 	}
-
-	fmt.Println("\nShims removed. You can re-run 'zuko setup' to recreate them.")
 	return nil
 }
