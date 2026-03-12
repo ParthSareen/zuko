@@ -29,16 +29,13 @@ zuko: blocked "gh issue create" — not in allowlist
 ## Install
 
 ```bash
-go install github.com/ParthSareen/zuko@latest
+curl -sSfL https://raw.githubusercontent.com/ParthSareen/zuko/main/install.sh | sh
 ```
 
-Or build from source:
+Or with Go:
 
 ```bash
-git clone https://github.com/ParthSareen/zuko.git
-cd zuko
-go build -o zuko .
-cp zuko /usr/local/bin/zuko
+go install github.com/ParthSareen/zuko@latest
 ```
 
 ## Setup
