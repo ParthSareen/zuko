@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
@@ -13,24 +12,31 @@ import (
 )
 
 func init() {
-	initCmd.Flags().BoolVar(&initDefenseInDepth, "defense-in-depth", false, "also add openclaw-level allowlist (both zuko + openclaw enforce)")
-	rootCmd.AddCommand(initCmd)
+	initOpenclawCmd.Flags().BoolVar(&initOCDefenseInDepth, "defense-in-depth", false, "also add openclaw-level allowlist (both zuko + openclaw enforce)")
+	initOpenclawCmd.Flags().StringVar(&initOCPath, "config", "", "path to openclaw.json (default ~/.openclaw/openclaw.json)")
+	initCmd.AddCommand(initOpenclawCmd)
 }
 
-var initDefenseInDepth bool
+var (
+	initOCDefenseInDepth bool
+	initOCPath           string
+)
 
-var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Merge zuko settings into existing openclaw.json (requires authentication)",
-	RunE:  runInit,
+var initOpenclawCmd = &cobra.Command{
+	Use:   "openclaw",
+	Short: "Merge zuko settings into openclaw.json (requires authentication)",
+	RunE:  runInitOpenclaw,
 }
 
-func openclawConfigPath() string {
+func resolveOpenclawPath() string {
+	if initOCPath != "" {
+		return initOCPath
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".openclaw", "openclaw.json")
 }
 
-func runInit(_ *cobra.Command, _ []string) error {
+func runInitOpenclaw(_ *cobra.Command, _ []string) error {
 	if err := auth.PromptAndVerifyPassword(); err != nil {
 		return err
 	}
@@ -46,9 +52,13 @@ func runInit(_ *cobra.Command, _ []string) error {
 		shimDir = filepath.Join(home, ".config", "zuko", "shims")
 	}
 
-	ocPath := openclawConfigPath()
+	ocPath := resolveOpenclawPath()
+
 	existing, err := os.ReadFile(ocPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("openclaw config not found at %s — use --config to specify the path", ocPath)
+		}
 		return fmt.Errorf("could not read %s: %w", ocPath, err)
 	}
 
@@ -67,10 +77,9 @@ func runInit(_ *cobra.Command, _ []string) error {
 	toolsMap := getOrCreateMap(ocConfig, "tools")
 	execMap := getOrCreateMap(toolsMap, "exec")
 
-	if initDefenseInDepth {
+	if initOCDefenseInDepth {
 		execMap["security"] = "allowlist"
 		allowlist := buildAllowlist(cfg)
-		// Merge with any existing allowlist entries
 		if existing, ok := execMap["allowlist"]; ok {
 			if existingList, ok := existing.([]any); ok {
 				seen := make(map[string]bool)
@@ -103,42 +112,10 @@ func runInit(_ *cobra.Command, _ []string) error {
 
 	fmt.Printf("Updated %s\n", ocPath)
 	fmt.Printf("  env.PATH → %s:${PATH}\n", shimDir)
-	if initDefenseInDepth {
+	if initOCDefenseInDepth {
 		fmt.Println("  tools.exec.security → allowlist (defense in depth)")
 	} else {
 		fmt.Println("  tools.exec.security → full (zuko enforces allowlist)")
 	}
 	return nil
-}
-
-// getOrCreateMap returns the nested map at key, creating it if missing or wrong type.
-func getOrCreateMap(parent map[string]any, key string) map[string]any {
-	if v, ok := parent[key]; ok {
-		if m, ok := v.(map[string]any); ok {
-			return m
-		}
-	}
-	m := make(map[string]any)
-	parent[key] = m
-	return m
-}
-
-func buildAllowlist(cfg *config.Config) []string {
-	var allowlist []string
-	for name, tool := range cfg.Tools {
-		for _, prefix := range tool.Allow {
-			var b strings.Builder
-			b.WriteString(name)
-			for _, token := range prefix {
-				b.WriteByte(' ')
-				b.WriteString(token)
-			}
-			b.WriteString(" *")
-			allowlist = append(allowlist, b.String())
-		}
-		if tool.AllowBare {
-			allowlist = append(allowlist, name)
-		}
-	}
-	return allowlist
 }

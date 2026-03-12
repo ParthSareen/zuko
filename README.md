@@ -47,16 +47,21 @@ cp zuko /usr/local/bin/zuko
 # Discover binaries on PATH, create shim symlinks, write default config
 zuko setup
 
-# Merge zuko settings into your existing openclaw.json
-zuko init
+# Option A: system-wide — prepend shim dir to PATH in your shell rc
+zuko init shell
 
-# Or with dual enforcement (both zuko + openclaw allowlists)
-zuko init --defense-in-depth
+# Option B: openclaw only — merge into openclaw.json
+zuko init openclaw
+
+# Option B with dual enforcement (both zuko + openclaw allowlists)
+zuko init openclaw --defense-in-depth
 ```
 
 `zuko setup` creates symlinks in `~/.config/zuko/shims/` and writes a default config to `~/.config/zuko/config.yaml`.
 
-`zuko init` prepends the shim directory to `env.PATH` in `~/.openclaw/openclaw.json` so the agent's `gh`, `himalaya`, etc. resolve to zuko's shims while all other tools (`git`, `node`, `python`, etc.) remain accessible.
+`zuko init shell` prepends the shim directory to `PATH` in `~/.zshrc` or `~/.bashrc` (auto-detected, or specify with `--rc`). This shadows `gh`, `himalaya`, etc. with zuko shims while keeping all other tools accessible.
+
+`zuko init openclaw` merges `env.PATH` into `~/.openclaw/openclaw.json` so only the agent's environment is affected. Use `--config` to specify a custom path.
 
 ## Config
 
@@ -129,7 +134,8 @@ These commands require authentication:
 |---------|-------------|
 | `zuko unlock` | Temporarily allow all commands through shims |
 | `zuko config` | Open allowlist config in `$EDITOR` |
-| `zuko init` | Merge settings into openclaw.json |
+| `zuko init shell` | Prepend shim dir to PATH in shell rc |
+| `zuko init openclaw` | Merge settings into openclaw.json |
 | `zuko add` | Add a new tool |
 | `zuko remove` | Remove a tool |
 
@@ -158,7 +164,8 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 |---------|-------------|
 | `zuko setup` | Discover binaries, create shim symlinks, write config |
 | `zuko teardown` | Remove shim symlinks |
-| `zuko init` | Merge zuko settings into openclaw.json |
+| `zuko init shell` | Prepend shim dir to PATH in shell rc |
+| `zuko init openclaw` | Merge zuko settings into openclaw.json |
 | `zuko add` | Add a new CLI tool to the sandbox (requires auth) |
 | `zuko remove` | Remove a CLI tool from the sandbox (requires auth) |
 | `zuko config` | Edit allowlist config (requires auth) |
