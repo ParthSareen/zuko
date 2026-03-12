@@ -29,16 +29,15 @@ zuko: blocked "gh issue create" — not in allowlist
 ## Install
 
 ```bash
-go install github.com/ParthSareen/zuko@latest
-```
-
-Or build from source:
-
-```bash
 git clone https://github.com/ParthSareen/zuko.git
 cd zuko
-go build -o zuko .
-cp zuko /usr/local/bin/zuko
+make install
+```
+
+This builds the binary and installs it to `/usr/local/bin`. To install elsewhere:
+
+```bash
+make install PREFIX=~/.local
 ```
 
 ## Setup
