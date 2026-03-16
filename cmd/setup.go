@@ -28,6 +28,14 @@ func runSetup(_ *cobra.Command, _ []string) error {
 		cfg.ExpandPaths()
 	}
 
+	// Merge in any new default tools that aren't in the existing config
+	defaults := config.DefaultConfig()
+	for name, tool := range defaults.Tools {
+		if _, exists := cfg.Tools[name]; !exists {
+			cfg.Tools[name] = tool
+		}
+	}
+
 	shimDir := cfg.ShimDir
 	if shimDir == "" {
 		shimDir = config.ConfigDir() + "/shims"
