@@ -7,10 +7,13 @@ import (
 )
 
 // PromptAndVerifyPassword validates the user's password via sudo.
-// Runs `sudo -kv` which forces a fresh password prompt and validates
-// against PAM without executing anything as root.
-func PromptAndVerifyPassword() error {
-	cmd := exec.Command("sudo", "-kv", "-p", "Zuko: authenticate to proceed\nPassword: ")
+func PromptAndVerifyPassword(reason string) error {
+	if reason == "" {
+		reason = "authenticate to proceed"
+	}
+	prompt := fmt.Sprintf("Zuko: %s\nPassword: ", reason)
+
+	cmd := exec.Command("sudo", "-kv", "-p", prompt)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

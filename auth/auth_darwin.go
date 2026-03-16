@@ -12,13 +12,17 @@ const touchIDSwift = `
 import LocalAuthentication
 import Foundation
 
+let reason = CommandLine.arguments.count > 1
+    ? CommandLine.arguments[1]
+    : "authenticate to proceed"
+
 let context = LAContext()
 var error: NSError?
 
 if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
     let semaphore = DispatchSemaphore(value: 0)
     var success = false
-    context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Zuko: authenticate to proceed") { result, _ in
+    context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { result, _ in
         success = result
         semaphore.signal()
     }
@@ -100,10 +104,15 @@ func buildAuthHelper() (string, error) {
 
 // PromptAndVerifyPassword attempts Touch ID first (via compiled helper with
 // biometry entitlement), then falls back to the macOS admin password dialog.
-func PromptAndVerifyPassword() error {
+func PromptAndVerifyPassword(reason string) error {
+	if reason == "" {
+		reason = "authenticate to proceed"
+	}
+	prompt := "Zuko: " + reason
+
 	// Try Touch ID via compiled, signed helper
 	if helperPath, err := buildAuthHelper(); err == nil {
-		cmd := exec.Command(helperPath)
+		cmd := exec.Command(helperPath, prompt)
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err == nil {
 			return nil
@@ -112,7 +121,7 @@ func PromptAndVerifyPassword() error {
 
 	// Fallback: osascript admin dialog (works on all Macs without swift/Xcode)
 	cmd := exec.Command("osascript", "-e",
-		`do shell script "echo ok" with administrator privileges with prompt "Zuko: authenticate to proceed"`)
+		fmt.Sprintf(`do shell script "echo ok" with administrator privileges with prompt %q`, prompt))
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 

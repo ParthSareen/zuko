@@ -23,7 +23,7 @@ var teardownShellCmd = &cobra.Command{
 }
 
 func runTeardownShell(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("teardown shell"); err != nil {
 		return err
 	}
 

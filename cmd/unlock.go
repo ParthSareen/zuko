@@ -35,7 +35,13 @@ func resolveTimeout() time.Duration {
 }
 
 func runUnlock(_ *cobra.Command, args []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	reason := "unlock all commands"
+	if len(args) == 1 {
+		reason = "unlock " + args[0]
+	} else if len(args) == 2 {
+		reason = "unlock " + args[0] + " " + args[1]
+	}
+	if err := auth.PromptAndVerifyPassword(reason); err != nil {
 		return err
 	}
 

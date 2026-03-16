@@ -21,7 +21,7 @@ var configCmd = &cobra.Command{
 }
 
 func runConfigEdit(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("edit config"); err != nil {
 		return err
 	}
 

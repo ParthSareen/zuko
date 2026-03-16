@@ -37,7 +37,7 @@ func resolveOpenclawPath() string {
 }
 
 func runInitOpenclaw(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("init openclaw"); err != nil {
 		return err
 	}
 

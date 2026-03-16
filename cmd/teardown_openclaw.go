@@ -23,7 +23,7 @@ var teardownOpenclawCmd = &cobra.Command{
 }
 
 func runTeardownOpenclaw(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("teardown openclaw"); err != nil {
 		return err
 	}
 

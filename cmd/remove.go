@@ -21,7 +21,7 @@ var removeCmd = &cobra.Command{
 }
 
 func runRemove(_ *cobra.Command, args []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("remove tool"); err != nil {
 		return err
 	}
 

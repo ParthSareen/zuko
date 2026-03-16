@@ -44,7 +44,7 @@ func resolveShellRC() (string, error) {
 }
 
 func runInitShell(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("init shell"); err != nil {
 		return err
 	}
 

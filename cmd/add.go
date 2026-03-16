@@ -36,7 +36,7 @@ Examples:
 }
 
 func runAdd(_ *cobra.Command, args []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("add tool"); err != nil {
 		return err
 	}
 

@@ -29,7 +29,7 @@ Subcommands:
 }
 
 func runTeardown(_ *cobra.Command, _ []string) error {
-	if err := auth.PromptAndVerifyPassword(); err != nil {
+	if err := auth.PromptAndVerifyPassword("teardown"); err != nil {
 		return err
 	}
 	return removeShims()
