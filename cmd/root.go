@@ -7,10 +7,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "zuko",
-	Short: "Read-only CLI sandbox for AI agents",
-	Long:  "Zuko wraps CLI tools (gh, himalaya, etc.) and enforces a read-only allowlist so AI agents can only run non-destructive commands.",
+	Use:     "zuko",
+	Short:   "Read-only CLI sandbox for AI agents",
+	Long:    "Zuko wraps CLI tools (gh, himalaya, etc.) and enforces a read-only allowlist so AI agents can only run non-destructive commands.",
+	Version: Version,
 }
 
 func Execute() {

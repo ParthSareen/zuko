@@ -4,6 +4,8 @@ builds:
   - binary: zuko
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/ParthSareen/zuko/cmd.Version={{.Version}}
     goos:
       - darwin
       - linux
