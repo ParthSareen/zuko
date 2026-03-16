@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/ParthSareen/zuko/auth"
+	"github.com/ParthSareen/zuko/config"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	unlockCmd.Flags().DurationVarP(&unlockDuration, "duration", "d", auth.DefaultUnlockDuration, "unlock duration")
+	unlockCmd.Flags().DurationVarP(&unlockDuration, "duration", "d", 0, "unlock duration (default: from 'zuko timeout' or 5m)")
 	rootCmd.AddCommand(unlockCmd)
 }
 
@@ -23,10 +24,22 @@ var unlockCmd = &cobra.Command{
 	RunE:  runUnlock,
 }
 
+func resolveTimeout() time.Duration {
+	if unlockDuration != 0 {
+		return unlockDuration
+	}
+	if cfg, err := config.Load(); err == nil && cfg.TimeoutMinutes > 0 {
+		return time.Duration(cfg.TimeoutMinutes) * time.Minute
+	}
+	return auth.DefaultUnlockDuration
+}
+
 func runUnlock(_ *cobra.Command, args []string) error {
 	if err := auth.PromptAndVerifyPassword(); err != nil {
 		return err
 	}
+
+	unlockDuration = resolveTimeout()
 
 	switch len(args) {
 	case 0:

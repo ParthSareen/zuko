@@ -18,8 +18,9 @@ type Tool struct {
 }
 
 type Config struct {
-	ShimDir string          `yaml:"shim_dir"`
-	Tools   map[string]Tool `yaml:"tools"`
+	ShimDir        string          `yaml:"shim_dir"`
+	TimeoutMinutes int             `yaml:"timeout_minutes,omitempty"`
+	Tools          map[string]Tool `yaml:"tools"`
 }
 
 func ConfigDir() string {
