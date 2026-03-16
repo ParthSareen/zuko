@@ -13,6 +13,7 @@ type Tool struct {
 	RealBinary string              `yaml:"real_binary"`
 	AllowBare  bool                `yaml:"allow_bare"`
 	Allow      [][]string          `yaml:"allow"`
+	Locked     [][]string          `yaml:"locked,omitempty"`
 	DenyFlags  map[string][]string `yaml:"deny_flags"`
 }
 

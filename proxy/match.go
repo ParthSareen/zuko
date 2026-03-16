@@ -68,6 +68,26 @@ func matchesPrefix(subcmds, prefix []string) bool {
 	return true
 }
 
+// CheckLocked returns whether the args match a locked subcommand for the tool.
+// If matched, it returns true and the matched subcommand string (e.g. "commit").
+func CheckLocked(tool config.Tool, args []string) (isLocked bool, subcmd string) {
+	if len(tool.Locked) == 0 || len(args) == 0 {
+		return false, ""
+	}
+
+	subcmds := extractSubcommands(args)
+	if len(subcmds) == 0 {
+		return false, ""
+	}
+
+	for _, prefix := range tool.Locked {
+		if matchesPrefix(subcmds, prefix) {
+			return true, strings.Join(prefix, " ")
+		}
+	}
+	return false, ""
+}
+
 // hasDeniedFlag checks if any args contain a denied flag for the given subcommand key.
 func hasDeniedFlag(denyFlags map[string][]string, key string, args []string) (bool, string) {
 	denied, ok := denyFlags[key]

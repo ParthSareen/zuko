@@ -99,6 +99,51 @@ func TestCheckPassthrough(t *testing.T) {
 	}
 }
 
+func TestCheckLocked(t *testing.T) {
+	tool := config.Tool{
+		AllowBare: false,
+		Allow: [][]string{
+			{"status"},
+			{"log"},
+			{"diff"},
+			{"add"},
+		},
+		Locked: [][]string{
+			{"commit"},
+			{"push"},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		args     []string
+		isLocked bool
+		subcmd   string
+	}{
+		{"locked commit", []string{"commit", "-m", "test"}, true, "commit"},
+		{"locked push", []string{"push", "origin", "main"}, true, "push"},
+		{"locked push with flag=value", []string{"--force-with-lease=yes", "push", "origin"}, true, "push"},
+		{"allowed status not locked", []string{"status"}, false, ""},
+		{"allowed log not locked", []string{"log", "--oneline"}, false, ""},
+		{"bare invocation not locked", nil, false, ""},
+		{"empty args not locked", []string{}, false, ""},
+		{"unknown not locked", []string{"bisect"}, false, ""},
+		{"flags only not locked", []string{"-v", "--debug"}, false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isLocked, subcmd := CheckLocked(tool, tt.args)
+			if isLocked != tt.isLocked {
+				t.Errorf("CheckLocked(%v) isLocked = %v, want %v", tt.args, isLocked, tt.isLocked)
+			}
+			if subcmd != tt.subcmd {
+				t.Errorf("CheckLocked(%v) subcmd = %q, want %q", tt.args, subcmd, tt.subcmd)
+			}
+		})
+	}
+}
+
 func TestExtractSubcommands(t *testing.T) {
 	tests := []struct {
 		name string

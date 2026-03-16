@@ -37,6 +37,21 @@ func Run(toolName string, args []string) {
 		}
 	}
 
+	// Check locked subcommands before the allowlist
+	if isLocked, subcmd := CheckLocked(tool, args); isLocked {
+		scope := toolName + ":" + subcmd
+		if auth.IsGranted(scope) {
+			argv := append([]string{toolName}, args...)
+			if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
+				fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
+				os.Exit(127)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run 'zuko unlock %s %s'\n",
+			toolName, subcmd, toolName, subcmd)
+		os.Exit(1)
+	}
+
 	allowed, matched := Check(tool, args)
 	if !allowed {
 		cmd := toolName

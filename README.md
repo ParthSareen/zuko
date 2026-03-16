@@ -1,6 +1,8 @@
 # zuko
 
-Read-only CLI sandbox for AI agents. Wraps tools like `gh` and `himalaya` behind an allowlist so agents can only run non-destructive commands.
+Read-only CLI sandbox for AI agents. Wraps tools like `gh` and `git` behind an allowlist so agents can only run non-destructive commands. Dangerous subcommands like `git commit` and `git push` require separate, scoped unlocks via Touch ID.
+
+Built this because I started writing bash scripts and moving binaries to only let my OpenClaw (called Zuko) have access to only read-only commands for certain tools.
 
 ## How it works
 
@@ -101,6 +103,7 @@ tools:
 ```
 
 - **allow** — prefix match. `["issue", "list"]` permits `gh issue list --state open -R foo/bar`.
+- **locked** — subcommands that are recognized but gated behind a scoped unlock (Touch ID per operation). Checked before `allow` so a locked subcommand can't accidentally match a broader allow entry.
 - **deny_flags** — per-subcommand flag blocklist. Blocks `gh api -X POST` while allowing `gh api /repos/...`.
 - **allow_bare** — whether bare invocation (e.g. `gh` with no args) is permitted.
 
@@ -116,18 +119,32 @@ Zuko uses your system password (macOS auth dialog / sudo on Linux) to gate privi
 
 ### Unlock (run unrestricted commands)
 
+Zuko supports tiered unlocking — global, per-tool, or per-subcommand:
+
 ```bash
-# Unlock for 5 minutes (default)
+# Global unlock for 5 minutes (all shims pass through)
 zuko unlock
 
-# Unlock for 30 minutes
-zuko unlock -d 30m
+# Unlock all locked subcommands under git
+zuko unlock git
 
-# Re-lock immediately
+# Unlock only git commit (git push stays locked)
+zuko unlock git commit
+
+# Unlock for 30 minutes
+zuko unlock git push -d 30m
+
+# Re-lock everything
 zuko lock
+
+# Re-lock only git commit (git push stays unlocked)
+zuko lock git commit
+
+# Re-lock all git grants
+zuko lock git
 ```
 
-While unlocked, all shims pass commands through without filtering. The agent can't run `zuko unlock` because `zuko` itself isn't on the shim PATH.
+Each unlock requires its own Touch ID prompt. While globally unlocked, all shims pass commands through without filtering. The agent can't run `zuko unlock` because `zuko` itself isn't on the shim PATH.
 
 ### Protected operations
 
@@ -135,7 +152,9 @@ These commands require authentication:
 
 | Command | What it does |
 |---------|-------------|
-| `zuko unlock` | Temporarily allow all commands through shims |
+| `zuko unlock` | Temporarily allow all commands (global) |
+| `zuko unlock <tool>` | Unlock all locked subcommands for a tool |
+| `zuko unlock <tool> <subcmd>` | Unlock a specific subcommand |
 | `zuko config` | Open allowlist config in `$EDITOR` |
 | `zuko init shell` | Prepend shim dir to PATH in shell rc |
 | `zuko init openclaw` | Merge settings into openclaw.json |
@@ -173,8 +192,8 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 | `zuko add` | Add a new CLI tool to the sandbox (requires auth) |
 | `zuko remove` | Remove a CLI tool from the sandbox (requires auth) |
 | `zuko config` | Edit allowlist config (requires auth) |
-| `zuko unlock` | Temporarily allow all commands (requires auth) |
-| `zuko lock` | Revoke unlock session |
+| `zuko unlock [tool] [subcmd]` | Temporarily allow commands (requires auth) |
+| `zuko lock [tool] [subcmd]` | Revoke unlock session (global or scoped) |
 | `zuko teardown` | Remove shim symlinks |
 | `zuko teardown shell` | Remove zuko PATH block from shell rc |
 | `zuko teardown openclaw` | Remove zuko settings from openclaw.json |
