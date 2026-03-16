@@ -52,6 +52,15 @@ func Run(toolName string, args []string) {
 		os.Exit(1)
 	}
 
+	// AllowAll: everything not locked passes through
+	if tool.AllowAll {
+		argv := append([]string{toolName}, args...)
+		if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
+			fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
+			os.Exit(127)
+		}
+	}
+
 	allowed, matched := Check(tool, args)
 	if !allowed {
 		cmd := toolName
