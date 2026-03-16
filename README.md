@@ -199,6 +199,47 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 | `zuko teardown openclaw` | Remove zuko settings from openclaw.json |
 | `zuko teardown all` | Remove shims + undo shell and openclaw init |
 
+## Hardening: block direct binary access
+
+Zuko shims only work when the agent uses `git` (resolved via PATH). A smart agent could bypass the shim by calling `/usr/bin/git` directly. If your AI coding tool supports pre-execution hooks, add one to block absolute paths to real binaries.
+
+For example, with Claude Code, create `~/.claude/hooks/zuko-guard.sh`:
+
+```bash
+#!/bin/bash
+input="$(cat)"
+command="$(echo "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('command',''))" 2>/dev/null)"
+
+blocked_paths=(
+  "/usr/bin/git"
+  "/opt/homebrew/bin/gh"
+)
+
+for path in "${blocked_paths[@]}"; do
+  if echo "$command" | grep -qF "$path"; then
+    echo "BLOCKED: use the zuko shim instead of $path"
+    exit 2
+  fi
+done
+```
+
+Then register it in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/zuko-guard.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## Platforms
 
 macOS and Linux. Authentication uses the native macOS dialog on Darwin and `sudo -v` on Linux.
