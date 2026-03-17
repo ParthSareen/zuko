@@ -3,12 +3,48 @@ package proxy
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
 	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
 )
+
+func CopyToClipboard(text string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	case "linux":
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	default:
+		return
+	}
+	cmd.Stdin = strings.NewReader(text)
+	cmd.Run()
+}
+
+func lastBlockedPath() string {
+	return filepath.Join(config.ConfigDir(), "last-blocked")
+}
+
+func saveLastBlocked(cmd string) {
+	os.WriteFile(lastBlockedPath(), []byte(cmd), 0600)
+}
+
+// LoadAndClearLastBlocked returns the last blocked command and removes the file.
+func LoadAndClearLastBlocked() string {
+	path := lastBlockedPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	os.Remove(path)
+	return string(data)
+}
 
 func Run(toolName string, args []string) {
 	cfg, err := config.Load()
@@ -47,8 +83,12 @@ func Run(toolName string, args []string) {
 				os.Exit(127)
 			}
 		}
-		fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run 'zuko unlock %s %s'\n",
-			toolName, subcmd, toolName, subcmd)
+		unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
+		originalCmd := toolName + " " + strings.Join(args, " ")
+		CopyToClipboard(unlockCmd)
+		saveLastBlocked(originalCmd)
+		fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+			toolName, subcmd, unlockCmd)
 		os.Exit(1)
 	}
 

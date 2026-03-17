@@ -7,6 +7,7 @@ import (
 
 	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
+	"github.com/ParthSareen/zuko/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -66,6 +67,12 @@ func runUnlock(_ *cobra.Command, args []string) error {
 		}
 		fmt.Printf("Unlocked %s for %s. Run 'zuko lock %s' to re-lock.\n",
 			strings.Replace(scope, ":", " ", 1), unlockDuration, strings.Replace(scope, ":", " ", 1))
+	}
+
+	// Restore the original blocked command to clipboard so user can paste it
+	if lastCmd := proxy.LoadAndClearLastBlocked(); lastCmd != "" {
+		proxy.CopyToClipboard(lastCmd)
+		fmt.Printf("Paste to retry: %s (copied to clipboard)\n", lastCmd)
 	}
 
 	return nil

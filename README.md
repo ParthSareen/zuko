@@ -4,6 +4,8 @@ Read-only CLI sandbox for AI agents. Wraps tools like `gh` and `git` behind an a
 
 Built this because I started writing bash scripts and moving binaries to only let my OpenClaw (called Zuko) have access to only read-only commands for certain tools.
 
+Now I use it on my mac, so that I can run agents a bit more autonomously without having to intervene.
+
 ## How it works
 
 Zuko is a single Go binary that acts as a [multicall binary](https://en.wikipedia.org/wiki/Multicall_binary). When symlinked as `gh`, it intercepts the call, checks the command against an allowlist, and either proxies to the real binary or blocks it.
@@ -76,6 +78,14 @@ The allowlist lives at `~/.config/zuko/config.yaml`:
 shim_dir: ~/.config/zuko/shims
 
 tools:
+  git:
+    real_binary: /usr/bin/git
+    allow_all: true
+    locked:
+      - [commit]
+      - [push]
+      - [tag]
+
   gh:
     real_binary: /opt/homebrew/bin/gh
     allow_bare: true
@@ -91,19 +101,11 @@ tools:
       # ... see config.yaml for full list
     deny_flags:
       api: ["-X", "--method", "-f", "--raw-field", "-F", "--field", "--input"]
-
-  himalaya:
-    real_binary: /usr/local/bin/himalaya
-    allow_bare: true
-    allow:
-      - ["envelope", "list"]
-      - ["message", "read"]
-      # ...
-    deny_flags: {}
 ```
 
+- **allow_all** — pass everything through except `locked` subcommands. Ideal for tools like `git` where most commands are safe.
 - **allow** — prefix match. `["issue", "list"]` permits `gh issue list --state open -R foo/bar`.
-- **locked** — subcommands that are recognized but gated behind a scoped unlock (Touch ID per operation). Checked before `allow` so a locked subcommand can't accidentally match a broader allow entry.
+- **locked** — subcommands gated behind a scoped unlock (Touch ID per operation). Checked before `allow` so a locked subcommand can't accidentally match a broader allow entry.
 - **deny_flags** — per-subcommand flag blocklist. Blocks `gh api -X POST` while allowing `gh api /repos/...`.
 - **allow_bare** — whether bare invocation (e.g. `gh` with no args) is permitted.
 
@@ -115,7 +117,7 @@ zuko config
 
 ## Authentication
 
-Zuko uses your system password (macOS auth dialog / sudo on Linux) to gate privileged operations.
+Zuko uses Touch ID on macOS (with fallback to system password dialog) or `sudo` on Linux to gate privileged operations.
 
 ### Unlock (run unrestricted commands)
 
@@ -184,8 +186,6 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 
 | Command | Description |
 |---------|-------------|
-| Command | Description |
-|---------|-------------|
 | `zuko setup` | Discover binaries, create shim symlinks, write config |
 | `zuko init shell` | Prepend shim dir to PATH in shell rc |
 | `zuko init openclaw` | Merge zuko settings into openclaw.json |
@@ -194,6 +194,8 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 | `zuko config` | Edit allowlist config (requires auth) |
 | `zuko unlock [tool] [subcmd]` | Temporarily allow commands (requires auth) |
 | `zuko lock [tool] [subcmd]` | Revoke unlock session (global or scoped) |
+| `zuko timeout [minutes]` | Get or set default unlock duration |
+| `zuko version` | Print version |
 | `zuko teardown` | Remove shim symlinks |
 | `zuko teardown shell` | Remove zuko PATH block from shell rc |
 | `zuko teardown openclaw` | Remove zuko settings from openclaw.json |
