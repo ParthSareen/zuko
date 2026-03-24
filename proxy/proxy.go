@@ -8,9 +8,11 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
+	"github.com/ParthSareen/zuko/log"
 )
 
 func CopyToClipboard(text string) {
@@ -46,6 +48,21 @@ func LoadAndClearLastBlocked() string {
 	return string(data)
 }
 
+func execTool(toolName string, realBinary string, args []string) {
+	argv := append([]string{toolName}, args...)
+	if err := syscall.Exec(realBinary, argv, os.Environ()); err != nil {
+		fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", realBinary, err)
+		os.Exit(127)
+	}
+}
+
+func resolveTimeout(cfg *config.Config) time.Duration {
+	if cfg.TimeoutMinutes > 0 {
+		return time.Duration(cfg.TimeoutMinutes) * time.Minute
+	}
+	return auth.DefaultUnlockDuration
+}
+
 func Run(toolName string, args []string) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -64,58 +81,83 @@ func Run(toolName string, args []string) {
 		os.Exit(1)
 	}
 
-	// If unlocked, skip allowlist enforcement
-	if auth.IsUnlocked() {
-		argv := append([]string{toolName}, args...)
-		if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
-			fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
-			os.Exit(127)
-		}
-	}
-
-	// Check locked subcommands before the allowlist
+	// Check locked subcommands first (takes priority over AllowAll)
 	if isLocked, subcmd := CheckLocked(tool, args); isLocked {
 		scope := toolName + ":" + subcmd
-		if auth.IsGranted(scope) {
-			argv := append([]string{toolName}, args...)
-			if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
-				fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
-				os.Exit(127)
-			}
+		// Check if globally unlocked or specifically granted for this scope
+		if auth.IsUnlocked() || auth.IsGranted(scope) {
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed", Scope: scope})
+			execTool(toolName, tool.RealBinary, args)
+			return
 		}
-		unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
-		originalCmd := toolName + " " + strings.Join(args, " ")
-		CopyToClipboard(unlockCmd)
-		saveLastBlocked(originalCmd)
-		fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
-			toolName, subcmd, unlockCmd)
-		os.Exit(1)
+
+		// Prompt for auth inline
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: scope})
+		reason := toolName + " " + subcmd
+		if err := auth.PromptAndVerifyPassword(reason); err != nil {
+			// Auth failed/cancelled — fall back to clipboard method
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "auth_failed", Scope: scope, Error: err.Error()})
+			unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
+			originalCmd := toolName + " " + strings.Join(args, " ")
+			CopyToClipboard(unlockCmd)
+			saveLastBlocked(originalCmd)
+			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+				toolName, subcmd, unlockCmd)
+			os.Exit(1)
+		}
+
+		// Auth succeeded — grant scoped unlock and execute
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "granted", Scope: scope})
+		if err := auth.UnlockScope(scope, resolveTimeout(cfg)); err != nil {
+			fmt.Fprintf(os.Stderr, "zuko: failed to unlock: %v\n", err)
+			os.Exit(1)
+		}
+		execTool(toolName, tool.RealBinary, args)
+		return
+	}
+
+	// If globally unlocked, skip allowlist enforcement
+	if auth.IsUnlocked() {
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed"})
+		execTool(toolName, tool.RealBinary, args)
+		return
 	}
 
 	// AllowAll: everything not locked passes through
 	if tool.AllowAll {
-		argv := append([]string{toolName}, args...)
-		if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
-			fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
-			os.Exit(127)
-		}
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed"})
+		execTool(toolName, tool.RealBinary, args)
+		return
 	}
 
 	allowed, matched := Check(tool, args)
 	if !allowed {
-		cmd := toolName
-		if matched != "" {
-			cmd = toolName + " " + matched
-		} else if len(args) > 0 {
-			cmd = toolName + " " + strings.Join(args, " ")
+		// Prompt for auth inline for allowlist blocks
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: "allowlist"})
+		reason := "unlock all commands"
+		if err := auth.PromptAndVerifyPassword(reason); err != nil {
+			// Auth failed/cancelled — fall back to showing the block message
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "auth_failed", Error: err.Error()})
+			cmd := toolName
+			if matched != "" {
+				cmd = toolName + " " + matched
+			} else if len(args) > 0 {
+				cmd = toolName + " " + strings.Join(args, " ")
+			}
+			fmt.Fprintf(os.Stderr, "zuko: blocked %q — not in allowlist\n", cmd)
+			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "zuko: blocked %q — not in allowlist\n", cmd)
-		os.Exit(1)
+
+		// Auth succeeded — grant global unlock and execute
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "granted"})
+		if err := auth.Unlock(resolveTimeout(cfg)); err != nil {
+			fmt.Fprintf(os.Stderr, "zuko: failed to unlock: %v\n", err)
+			os.Exit(1)
+		}
+		execTool(toolName, tool.RealBinary, args)
+		return
 	}
 
-	argv := append([]string{toolName}, args...)
-	if err := syscall.Exec(tool.RealBinary, argv, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "zuko: exec %s: %v\n", tool.RealBinary, err)
-		os.Exit(127)
-	}
+	log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed"})
+	execTool(toolName, tool.RealBinary, args)
 }
