@@ -10,12 +10,13 @@ import (
 )
 
 type Tool struct {
-	RealBinary string              `yaml:"real_binary"`
-	AllowBare  bool                `yaml:"allow_bare"`
-	AllowAll   bool                `yaml:"allow_all,omitempty"`
-	Allow      [][]string          `yaml:"allow"`
-	Locked     [][]string          `yaml:"locked,omitempty"`
-	DenyFlags  map[string][]string `yaml:"deny_flags"`
+	RealBinary     string              `yaml:"real_binary"`
+	AllowBare      bool                `yaml:"allow_bare"`
+	AllowAll       bool                `yaml:"allow_all,omitempty"`
+	Allow          [][]string          `yaml:"allow"`
+	Locked         [][]string          `yaml:"locked,omitempty"`
+	DenyFlags      map[string][]string `yaml:"deny_flags"`
+	DangerousFlags map[string][]string `yaml:"dangerous_flags"` // Flags that trigger clipboard-only mode
 }
 
 type Config struct {

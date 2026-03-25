@@ -137,6 +137,8 @@ func FormatEntry(e Entry) string {
 	switch e.Action {
 	case "blocked":
 		return fmt.Sprintf("[%s] BLOCKED: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
+	case "blocked_dangerous":
+		return fmt.Sprintf("[%s] BLOCKED_DANGEROUS: %s (scope: %s) [%s] - clipboard only", formatTime(e.Timestamp), cmd, e.Scope, who)
 	case "granted":
 		return fmt.Sprintf("[%s] GRANTED: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
 	case "allowed":

@@ -63,6 +63,26 @@ func resolveTimeout(cfg *config.Config) time.Duration {
 	return auth.DefaultUnlockDuration
 }
 
+// hasDangerousFlag checks if any dangerous flags are present for the given subcommand.
+// Dangerous flags trigger clipboard-only mode (no auto-prompt).
+func hasDangerousFlag(dangerousFlags map[string][]string, subcmd string, args []string) bool {
+	if dangerousFlags == nil {
+		return false
+	}
+	flags, ok := dangerousFlags[subcmd]
+	if !ok {
+		return false
+	}
+	for _, arg := range args {
+		for _, flag := range flags {
+			if arg == flag || strings.HasPrefix(arg, flag+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func Run(toolName string, args []string) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -91,7 +111,19 @@ func Run(toolName string, args []string) {
 			return
 		}
 
-		// Prompt for auth inline
+		// Check for dangerous flags that trigger clipboard-only mode
+		if hasDangerousFlag(tool.DangerousFlags, subcmd, args) {
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked_dangerous", Scope: scope})
+			unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
+			originalCmd := toolName + " " + strings.Join(args, " ")
+			CopyToClipboard(unlockCmd)
+			saveLastBlocked(originalCmd)
+			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+				toolName, subcmd, unlockCmd)
+			os.Exit(1)
+		}
+
+		// Prompt for auth inline (tier 1: mostly safe commands)
 		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: scope})
 		reason := toolName + " " + subcmd
 		if err := auth.PromptAndVerifyPassword(reason); err != nil {
