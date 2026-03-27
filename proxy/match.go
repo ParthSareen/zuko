@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/ParthSareen/zuko/config"
@@ -35,6 +36,7 @@ func Check(tool config.Tool, args []string) (allowed bool, matched string) {
 // extractSubcommands pulls out positional (non-flag) tokens from args.
 // Flags are tokens starting with "-". If a flag doesn't contain "=",
 // the next token is assumed to be its value and skipped.
+// Paths are normalized to their basenames to prevent bypasses like /usr/bin/git.
 func extractSubcommands(args []string) []string {
 	var subcmds []string
 	skip := false
@@ -50,7 +52,8 @@ func extractSubcommands(args []string) []string {
 			}
 			continue
 		}
-		subcmds = append(subcmds, arg)
+		// Normalize paths to basename (e.g., /usr/bin/git -> git)
+		subcmds = append(subcmds, filepath.Base(arg))
 	}
 	return subcmds
 }
