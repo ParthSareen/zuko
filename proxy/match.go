@@ -21,10 +21,11 @@ func Check(tool config.Tool, args []string) (allowed bool, matched string) {
 
 	for _, prefix := range tool.Allow {
 		if matchesPrefix(subcmds, prefix) {
-			// Check deny_flags for the first token of the matched prefix
+			// Check deny_flags for the matched prefix (specific override beats general)
 			if len(prefix) > 0 {
-				if denied, _ := hasDeniedFlag(tool.DenyFlags, prefix[0], args); denied {
-					return false, strings.Join(prefix, " ")
+				key := strings.Join(prefix, " ")
+				if denied, _ := hasDeniedFlag(tool.DenyFlags, key, args); denied {
+					return false, key
 				}
 			}
 			return true, strings.Join(prefix, " ")

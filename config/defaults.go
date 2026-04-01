@@ -35,7 +35,8 @@ func DefaultConfig() *Config {
 					{"workflow", "view"},
 				},
 				DenyFlags: map[string][]string{
-					"api": {"-X", "--method", "-f", "--raw-field", "-F", "--field", "--input"},
+					// Block mutation methods but allow field flags for graphql queries
+					"api": {"-X", "--method"},
 				},
 			},
 			"git": {

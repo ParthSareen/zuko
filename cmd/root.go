@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Version = "dev"
+var Version = "0.3.2"
 
 var rootCmd = &cobra.Command{
 	Use:     "zuko",

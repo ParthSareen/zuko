@@ -25,7 +25,7 @@ type Entry struct {
 	Parent    string    `json:"parent,omitempty"`
 }
 
-func logsPath() string {
+func LogsPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "zuko", "logs.jsonl")
 }
@@ -38,7 +38,7 @@ func Write(entry Entry) {
 	entry.Process = getProcessName(entry.PID)
 	entry.Parent = getProcessName(entry.PPID)
 
-	f, err := os.OpenFile(logsPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(LogsPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return
 	}
@@ -68,7 +68,7 @@ func getProcessName(pid int) string {
 
 // Read returns all log entries (newest first), limited to maxEntries.
 func Read(maxEntries int) ([]Entry, error) {
-	data, err := os.ReadFile(logsPath())
+	data, err := os.ReadFile(LogsPath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -101,7 +101,7 @@ func Read(maxEntries int) ([]Entry, error) {
 
 // Clear removes all logs.
 func Clear() error {
-	return os.Remove(logsPath())
+	return os.Remove(LogsPath())
 }
 
 func splitLines(data []byte) [][]byte {
