@@ -18,12 +18,14 @@ func init() {
 	logsCmd.Flags().IntVarP(&logsLimit, "limit", "n", 50, "number of entries to show")
 	logsCmd.Flags().BoolVarP(&logsClear, "clear", "c", false, "clear all logs")
 	logsCmd.Flags().BoolVarP(&logsFollow, "follow", "f", false, "follow log output")
+	logsCmd.Flags().BoolVarP(&logsRotate, "rotate", "r", false, "keep only last 1000 entries")
 	rootCmd.AddCommand(logsCmd)
 }
 
 var logsLimit int
 var logsClear bool
 var logsFollow bool
+var logsRotate bool
 
 var logsCmd = &cobra.Command{
 	Use:   "logs",
@@ -38,6 +40,14 @@ func runLogs(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to clear logs: %w", err)
 		}
 		fmt.Println("Logs cleared.")
+		return nil
+	}
+
+	if logsRotate {
+		if err := log.Rotate(1000); err != nil {
+			return fmt.Errorf("failed to rotate logs: %w", err)
+		}
+		fmt.Println("Logs rotated (kept last 1000 entries).")
 		return nil
 	}
 

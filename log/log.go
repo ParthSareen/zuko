@@ -46,6 +46,11 @@ func Write(entry Entry) {
 
 	enc := json.NewEncoder(f)
 	enc.Encode(entry)
+
+	// Rotate logs asynchronously if file is getting large (>10000 lines)
+	if info, err := f.Stat(); err == nil && info.Size() > 2*1024*1024 {
+		go Rotate(1000)
+	}
 }
 
 func getProcessName(pid int) string {
@@ -102,6 +107,46 @@ func Read(maxEntries int) ([]Entry, error) {
 // Clear removes all logs.
 func Clear() error {
 	return os.Remove(LogsPath())
+}
+
+// Rotate truncates the log file to keep only the last maxEntries entries.
+func Rotate(maxEntries int) error {
+	if maxEntries <= 0 {
+		return nil
+	}
+
+	data, err := os.ReadFile(LogsPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	lines := splitLines(data)
+	if len(lines) <= maxEntries {
+		return nil
+	}
+
+	// Keep only the last maxEntries lines
+	start := len(lines) - maxEntries
+	kept := lines[start:]
+
+	// Rewrite file with kept entries
+	f, err := os.Create(LogsPath())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, line := range kept {
+		if len(line) == 0 {
+			continue
+		}
+		f.Write(line)
+		f.Write([]byte{'\n'})
+	}
+	return nil
 }
 
 func splitLines(data []byte) [][]byte {

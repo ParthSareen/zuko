@@ -19,19 +19,28 @@ func Check(tool config.Tool, args []string) (allowed bool, matched string) {
 		return tool.AllowBare, ""
 	}
 
+	// Find the most specific (longest) matching prefix so that e.g.
+	// {"api", "graphql"} takes precedence over {"api"} for deny-flag lookup.
+	var bestPrefix []string
+	found := false
 	for _, prefix := range tool.Allow {
-		if matchesPrefix(subcmds, prefix) {
-			// Check deny_flags for the matched prefix (specific override beats general)
-			if len(prefix) > 0 {
-				key := strings.Join(prefix, " ")
-				if denied, _ := hasDeniedFlag(tool.DenyFlags, key, args); denied {
-					return false, key
-				}
-			}
-			return true, strings.Join(prefix, " ")
+		if matchesPrefix(subcmds, prefix) && (!found || len(prefix) > len(bestPrefix)) {
+			bestPrefix = prefix
+			found = true
 		}
 	}
-	return false, strings.Join(subcmds, " ")
+
+	if !found {
+		return false, strings.Join(subcmds, " ")
+	}
+
+	key := strings.Join(bestPrefix, " ")
+	if len(bestPrefix) > 0 {
+		if denied, _ := hasDeniedFlag(tool.DenyFlags, key, args); denied {
+			return false, key
+		}
+	}
+	return true, key
 }
 
 // extractSubcommands pulls out positional (non-flag) tokens from args.

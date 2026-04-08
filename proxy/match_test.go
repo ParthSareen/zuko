@@ -16,6 +16,7 @@ func TestCheck(t *testing.T) {
 			{"pr", "view"},
 			{"status"},
 			{"api"},
+			{"api", "graphql"},
 		},
 		DenyFlags: map[string][]string{
 			"api": {"-X", "--method", "-f", "--raw-field"},
@@ -42,6 +43,8 @@ func TestCheck(t *testing.T) {
 		{"api --method denied", []string{"api", "--method", "DELETE", "/repos/foo/bar"}, false},
 		{"api -f denied", []string{"api", "-f", "body=test"}, false},
 		{"api --raw-field denied", []string{"api", "--raw-field", "body=test"}, false},
+		{"api graphql with -f allowed (specific prefix beats deny)", []string{"api", "graphql", "-f", "query=..."}, true},
+		{"api graphql with -F allowed", []string{"api", "graphql", "-F", "owner=ollama", "-F", "repo=ollama"}, true},
 		{"completely unknown", []string{"auth", "login"}, false},
 	}
 
