@@ -1,0 +1,126 @@
+shim_dir: ~/.config/zuko/shims
+timeout_minutes: 5
+tools:
+    git:
+        real_binary: /usr/bin/git
+        allow_bare: false
+        allow_all: true
+        allow:
+            - - status
+            - - diff
+            - - log
+            - - show
+            - - branch
+            - - config
+            - - remote
+            - - fetch
+            - - pull
+            - - stash
+              - list
+            - - stash
+              - show
+            - - tag
+              - -l
+            - - tag
+              - --list
+            - - tag
+              - --sort
+            - - rev-parse
+            - - for-each-ref
+            - - ls-files
+        locked:
+            - - commit
+            - - push
+            - - tag
+            - - reset
+            - - rebase
+            - - cherry-pick
+            - - merge
+            - - stash
+            - - clean
+            - - rm
+            - - mv
+            - - init
+            - - clone
+        deny_flags: {}
+        dangerous_flags:
+            reset:
+                - --hard
+    gh:
+        real_binary: /usr/local/bin/gh
+        allow_bare: true
+        allow:
+            - - issue
+              - list
+            - - issue
+              - view
+            - - issue
+              - status
+            - - issue
+              - comments
+            - - pr
+              - list
+            - - pr
+              - view
+            - - pr
+              - status
+            - - pr
+              - diff
+            - - pr
+              - checks
+            - - pr
+              - files
+            - - repo
+              - list
+            - - repo
+              - view
+            - - repo
+              - status
+            - - run
+              - list
+            - - run
+              - view
+            - - workflow
+              - list
+            - - workflow
+              - view
+            - - search
+              - issues
+            - - search
+              - prs
+            - - search
+              - repos
+            - - search
+              - code
+            - - search
+              - commits
+            - - auth
+              - token
+            - - auth
+              - status
+            - - status
+            - - release
+              - list
+            - - release
+              - view
+            - - gist
+              - list
+            - - gist
+              - view
+            - - label
+              - list
+            - - api
+            - - api
+              - GET
+            - - api
+              - graphql
+        deny_flags:
+            api:
+                - -X
+                - --method
+                - -f
+                - --raw-field
+                - -F
+                - --field
+                - --input
+        dangerous_flags: {}
