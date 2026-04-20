@@ -83,6 +83,26 @@ func hasDangerousFlag(dangerousFlags map[string][]string, subcmd string, args []
 	return false
 }
 
+// hasUnlockedFlag checks if any unlocked flags are present for the given subcommand.
+// Unlocked flags bypass the lock for that command.
+func hasUnlockedFlag(unlockedFlags map[string][]string, subcmd string, args []string) bool {
+	if unlockedFlags == nil {
+		return false
+	}
+	flags, ok := unlockedFlags[subcmd]
+	if !ok {
+		return false
+	}
+	for _, arg := range args {
+		for _, flag := range flags {
+			if arg == flag || strings.HasPrefix(arg, flag+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func Run(toolName string, args []string) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -129,8 +149,18 @@ func Run(toolName string, args []string) {
 			execTool(toolName, tool.RealBinary, args)
 			return
 		}
+		// A tool-level unlock permits bare invocation.
+		if auth.IsGranted(toolName) {
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed", Scope: toolName})
+			execTool(toolName, tool.RealBinary, args)
+			return
+		}
 		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: "bare"})
-		fmt.Fprintf(os.Stderr, "zuko: %s (bare) is not allowed\n", toolName)
+		unlockCmd := fmt.Sprintf("zuko unlock %s", toolName)
+		CopyToClipboard(unlockCmd)
+		saveLastBlocked(toolName)
+		fmt.Fprintf(os.Stderr, "zuko: %s (bare) is not allowed — run '%s' to allow (copied to clipboard)\n",
+			toolName, unlockCmd)
 		os.Exit(1)
 	}
 
@@ -148,6 +178,12 @@ func Run(toolName string, args []string) {
 				fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
 					toolName, subcmd, unlockCmd)
 				os.Exit(1)
+			}
+			// Check if unlocked flags are present - bypass lock
+			if hasUnlockedFlag(tool.UnlockedFlags, subcmd, args) {
+				log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed", Scope: scope})
+				execTool(toolName, tool.RealBinary, args)
+				return
 			}
 			// Locked but not dangerous - require auth
 			if auth.IsGranted(scope) {
@@ -220,8 +256,29 @@ func Run(toolName string, args []string) {
 		return
 	}
 
-	// Not in allowlist, not locked, not AllowAll - block it
+	// Not in allowlist, not locked, not AllowAll.
+	// Check if an unlock scope covers this command so that e.g.
+	// `zuko unlock gh issue` permits `gh issue edit`.
+	subcmds := extractSubcommands(args)
+	if len(subcmds) > 0 {
+		scope := toolName + ":" + strings.Join(subcmds, " ")
+		if auth.IsGranted(scope) {
+			log.Write(log.Entry{Tool: toolName, Args: args, Action: "allowed", Scope: scope})
+			execTool(toolName, tool.RealBinary, args)
+			return
+		}
+	}
+
 	log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: "allowlist"})
-	fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist\n", toolName, strings.Join(args, " "))
+	if len(subcmds) > 0 {
+		unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmds[0])
+		originalCmd := toolName + " " + strings.Join(args, " ")
+		CopyToClipboard(unlockCmd)
+		saveLastBlocked(originalCmd)
+		fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist — run '%s' to allow (copied to clipboard)\n",
+			toolName, strings.Join(args, " "), unlockCmd)
+	} else {
+		fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist\n", toolName, strings.Join(args, " "))
+	}
 	os.Exit(1)
 }

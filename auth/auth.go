@@ -87,7 +87,8 @@ func IsUnlocked() bool {
 }
 
 // IsGranted checks if the given scope is unlocked.
-// It checks global first, then tool-level (e.g. "git"), then exact (e.g. "git:commit").
+// It checks global first, then exact (e.g. "git:commit amend"),
+// then any shorter subcommand prefix (e.g. "git:commit"), then tool-level ("git").
 func IsGranted(scope string) bool {
 	state := loadState()
 
@@ -100,16 +101,30 @@ func IsGranted(scope string) bool {
 		return false
 	}
 
-	// Exact scope match (e.g. "git:commit")
+	// Exact scope match (e.g. "git:commit amend")
 	if g, ok := state.Grants[scope]; ok && grantValid(g) {
 		return true
 	}
 
-	// Tool-level match: "git" covers "git:commit"
-	if parts := strings.SplitN(scope, ":", 2); len(parts) == 2 {
-		if g, ok := state.Grants[parts[0]]; ok && grantValid(g) {
+	parts := strings.SplitN(scope, ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	tool := parts[0]
+
+	// Walk subcommand prefixes from most to least specific:
+	// "gh:issue edit" -> check "gh:issue"
+	subcmds := strings.Fields(parts[1])
+	for i := len(subcmds) - 1; i >= 1; i-- {
+		prefix := tool + ":" + strings.Join(subcmds[:i], " ")
+		if g, ok := state.Grants[prefix]; ok && grantValid(g) {
 			return true
 		}
+	}
+
+	// Tool-level match: "git" covers "git:commit"
+	if g, ok := state.Grants[tool]; ok && grantValid(g) {
+		return true
 	}
 
 	return false
