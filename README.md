@@ -182,6 +182,18 @@ zuko remove jq
 
 All `add`/`remove` operations require authentication. You can also fine-tune the config directly with `zuko config`.
 
+## Briefing an agent
+
+`zuko clanker` (alias `zuko usage`) prints a self-contained brief intended for AI agents — what zuko is, the four outcomes (allowed / blocked / locked / denied flag), the hard rules (no `/usr/bin/git`, no `PATH=` tricks, no running auth-gated zuko commands), and the current allow / locked / deny_flags lists pulled live from `~/.config/zuko/config.yaml`.
+
+```bash
+# Pipe into an agent's system prompt or save to a project memory file
+zuko clanker > CLAUDE.md
+zuko clanker | pbcopy
+```
+
+The digest re-renders from config on every run, so updates to the allowlist show up immediately. The output is read-only and safe for the agent itself to invoke when it wants to refresh its view of the rules.
+
 ## Commands
 
 | Command | Description |
@@ -196,6 +208,7 @@ All `add`/`remove` operations require authentication. You can also fine-tune the
 | `zuko lock [tool] [subcmd]` | Revoke unlock session (global or scoped) |
 | `zuko timeout [minutes]` | Get or set default unlock duration |
 | `zuko version` | Print version |
+| `zuko clanker` | Print LLM-targeted usage brief + current allow/locked rules |
 | `zuko teardown` | Remove shim symlinks |
 | `zuko teardown shell` | Remove zuko PATH block from shell rc |
 | `zuko teardown openclaw` | Remove zuko settings from openclaw.json |
