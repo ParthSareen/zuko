@@ -73,11 +73,9 @@ time-limited, scoped grant. Re-issue the original command verbatim.
 ## How to ask the user for an unlock
 
 Whenever a wrapped command is blocked or locked, zuko prints the exact
-unlock command to run and copies it to the clipboard. Pass that string to
-the user and pause. Example:
+unlock command to run. Pass that string to the user and pause. Example:
 
     zuko: git commit requires unlock - run 'zuko unlock git commit'
-    (copied to clipboard)
 
 Tell the user: "git commit is locked. Run 'zuko unlock git commit' in your
 terminal, then I'll retry." Do not invent unlock commands - use the one

@@ -3,9 +3,6 @@ package proxy
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -14,39 +11,6 @@ import (
 	"github.com/ParthSareen/zuko/config"
 	"github.com/ParthSareen/zuko/log"
 )
-
-func CopyToClipboard(text string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("pbcopy")
-	case "linux":
-		cmd = exec.Command("xclip", "-selection", "clipboard")
-	default:
-		return
-	}
-	cmd.Stdin = strings.NewReader(text)
-	cmd.Run()
-}
-
-func lastBlockedPath() string {
-	return filepath.Join(config.ConfigDir(), "last-blocked")
-}
-
-func saveLastBlocked(cmd string) {
-	os.WriteFile(lastBlockedPath(), []byte(cmd), 0600)
-}
-
-// LoadAndClearLastBlocked returns the last blocked command and removes the file.
-func LoadAndClearLastBlocked() string {
-	path := lastBlockedPath()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	os.Remove(path)
-	return string(data)
-}
 
 func execTool(toolName string, realBinary string, args []string) {
 	argv := append([]string{toolName}, args...)
@@ -64,7 +28,7 @@ func resolveTimeout(cfg *config.Config) time.Duration {
 }
 
 // hasDangerousFlag checks if any dangerous flags are present for the given subcommand.
-// Dangerous flags trigger clipboard-only mode (no auto-prompt).
+// Dangerous flags require a manual unlock instead of an automatic prompt.
 func hasDangerousFlag(dangerousFlags map[string][]string, subcmd string, args []string) bool {
 	if dangerousFlags == nil {
 		return false
@@ -157,9 +121,7 @@ func Run(toolName string, args []string) {
 		}
 		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: "bare"})
 		unlockCmd := fmt.Sprintf("zuko unlock %s", toolName)
-		CopyToClipboard(unlockCmd)
-		saveLastBlocked(toolName)
-		fmt.Fprintf(os.Stderr, "zuko: %s (bare) is not allowed — run '%s' to allow (copied to clipboard)\n",
+		fmt.Fprintf(os.Stderr, "zuko: %s (bare) is not allowed — run '%s' to allow\n",
 			toolName, unlockCmd)
 		os.Exit(1)
 	}
@@ -172,10 +134,7 @@ func Run(toolName string, args []string) {
 			if hasDangerousFlag(tool.DangerousFlags, subcmd, args) {
 				log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked_dangerous", Scope: scope})
 				unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
-				originalCmd := toolName + " " + strings.Join(args, " ")
-				CopyToClipboard(unlockCmd)
-				saveLastBlocked(originalCmd)
-				fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+				fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s'\n",
 					toolName, subcmd, unlockCmd)
 				os.Exit(1)
 			}
@@ -196,10 +155,7 @@ func Run(toolName string, args []string) {
 			if err := auth.PromptAndVerifyPassword(reason); err != nil {
 				log.Write(log.Entry{Tool: toolName, Args: args, Action: "auth_failed", Scope: scope, Error: err.Error()})
 				unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
-				originalCmd := toolName + " " + strings.Join(args, " ")
-				CopyToClipboard(unlockCmd)
-				saveLastBlocked(originalCmd)
-				fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+				fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s'\n",
 					toolName, subcmd, unlockCmd)
 				os.Exit(1)
 			}
@@ -228,10 +184,7 @@ func Run(toolName string, args []string) {
 		if hasDangerousFlag(tool.DangerousFlags, subcmd, args) {
 			log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked_dangerous", Scope: scope})
 			unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
-			originalCmd := toolName + " " + strings.Join(args, " ")
-			CopyToClipboard(unlockCmd)
-			saveLastBlocked(originalCmd)
-			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s'\n",
 				toolName, subcmd, unlockCmd)
 			os.Exit(1)
 		}
@@ -240,10 +193,7 @@ func Run(toolName string, args []string) {
 		if err := auth.PromptAndVerifyPassword(reason); err != nil {
 			log.Write(log.Entry{Tool: toolName, Args: args, Action: "auth_failed", Scope: scope, Error: err.Error()})
 			unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
-			originalCmd := toolName + " " + strings.Join(args, " ")
-			CopyToClipboard(unlockCmd)
-			saveLastBlocked(originalCmd)
-			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s' (copied to clipboard)\n",
+			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s'\n",
 				toolName, subcmd, unlockCmd)
 			os.Exit(1)
 		}
@@ -272,10 +222,7 @@ func Run(toolName string, args []string) {
 	log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: "allowlist"})
 	if len(subcmds) > 0 {
 		unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmds[0])
-		originalCmd := toolName + " " + strings.Join(args, " ")
-		CopyToClipboard(unlockCmd)
-		saveLastBlocked(originalCmd)
-		fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist — run '%s' to allow (copied to clipboard)\n",
+		fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist — run '%s' to allow\n",
 			toolName, strings.Join(args, " "), unlockCmd)
 	} else {
 		fmt.Fprintf(os.Stderr, "zuko: %s %s is not in allowlist\n", toolName, strings.Join(args, " "))

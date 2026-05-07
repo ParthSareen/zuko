@@ -16,7 +16,7 @@ type Tool struct {
 	Allow          [][]string          `yaml:"allow"`
 	Locked         [][]string          `yaml:"locked,omitempty"`
 	DenyFlags      map[string][]string `yaml:"deny_flags"`
-	DangerousFlags map[string][]string `yaml:"dangerous_flags"` // Flags that trigger clipboard-only mode
+	DangerousFlags map[string][]string `yaml:"dangerous_flags"` // Flags that require manual unlock
 	UnlockedFlags  map[string][]string `yaml:"unlocked_flags"`  // Flags that bypass lock (e.g., "tag -l" allows list)
 }
 
