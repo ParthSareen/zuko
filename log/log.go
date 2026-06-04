@@ -186,6 +186,14 @@ func FormatEntry(e Entry) string {
 		return fmt.Sprintf("[%s] BLOCKED_DANGEROUS: %s (scope: %s) [%s] - manual unlock required", formatTime(e.Timestamp), cmd, e.Scope, who)
 	case "granted":
 		return fmt.Sprintf("[%s] GRANTED: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
+	case "remote_granted":
+		return fmt.Sprintf("[%s] REMOTE_GRANTED: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
+	case "remote_denied":
+		return fmt.Sprintf("[%s] REMOTE_DENIED: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
+	case "remote_timeout":
+		return fmt.Sprintf("[%s] REMOTE_TIMEOUT: %s (scope: %s) [%s]", formatTime(e.Timestamp), cmd, e.Scope, who)
+	case "remote_error":
+		return fmt.Sprintf("[%s] REMOTE_ERROR: %s (%s) [%s]", formatTime(e.Timestamp), cmd, e.Error, who)
 	case "allowed":
 		return fmt.Sprintf("[%s] ALLOWED: %s [%s]", formatTime(e.Timestamp), cmd, who)
 	case "auth_failed":

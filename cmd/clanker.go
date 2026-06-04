@@ -45,15 +45,28 @@ tools behave normally.
                   exits 1. STOP. Do not retry, do not try variants. Tell the
                   user the command is blocked and surface the 'zuko unlock ...'
                   hint zuko prints. Wait for them to unlock, then re-run.
-3. Locked      -> Touch ID prompt fires. If no human is present the prompt
-                  fails and the command exits 1. STOP and surface the
-                  'zuko unlock <tool> <subcmd>' hint to the user.
+3. Locked      -> run the original command normally through the zuko shim.
+                  If 'zuko serve' is running, a paired remote client may
+                  approve this exact command once. Otherwise the local
+                  authentication prompt fires. If no human is present, the
+                  command exits 1. STOP and surface the 'zuko unlock
+                  <tool> <subcmd>' hint to the user.
 4. Denied flag -> e.g. "gh api -X POST" blocked even though "gh api" is in
                   the allowlist. STOP. Do not retry with a different flag
                   shape to dodge the deny. Surface to the user.
 
 After a successful 'zuko unlock <tool> <subcmd>' the lock is open for a
 time-limited, scoped grant. Re-issue the original command verbatim.
+
+## Zuko approval is not Codex tool escalation
+
+If the user asks you to run a zuko-locked command such as 'git commit', do not
+preemptively replace it with a Codex/tool sandbox escalation request merely
+because this brief lists the command as locked. Execute the requested command
+through PATH so the zuko shim can ask 'zuko serve' for remote approval or show
+the local authentication/unlock hint. Only use your host tool's escalation
+mechanism when the host environment itself requires it for reasons unrelated to
+zuko.
 
 ## Hard rules
 
@@ -63,17 +76,21 @@ time-limited, scoped grant. Re-issue the original command verbatim.
   Do not assemble the path through 'sh -c' or printf. Do not symlink the
   real binary elsewhere. Any of these is a sandbox-evasion attempt and is
   not authorized.
-- DO NOT run 'zuko unlock', 'zuko lock', 'zuko config', 'zuko add',
-  'zuko remove', 'zuko init', 'zuko setup', 'zuko teardown', or
-  'zuko timeout'. These require Touch ID and are user-only.
+- DO NOT run 'zuko unlock', 'zuko lock', 'zuko config', 'zuko pair',
+  'zuko add', 'zuko remove', 'zuko init', 'zuko setup', 'zuko teardown',
+  or 'zuko timeout'. These require local authentication and are user-only.
 - DO NOT edit ~/.config/zuko/config.yaml directly.
 - DO use 'zuko clanker' (this command) and 'zuko version' freely - they are
   read-only.
+- DO run the original requested command through the shim when it is listed as
+  locked and the user has asked for that action. Zuko will decide whether the
+  command is remotely approved, locally approved, denied, or blocked.
 
 ## How to ask the user for an unlock
 
-Whenever a wrapped command is blocked or locked, zuko prints the exact
-unlock command to run. Pass that string to the user and pause. Example:
+Whenever a wrapped command cannot be remotely or locally approved, zuko prints
+the exact unlock command to run. Pass that string to the user and pause.
+Example:
 
     zuko: git commit requires unlock - run 'zuko unlock git commit'
 
@@ -109,7 +126,7 @@ func renderConfigDigest(cfg *config.Config) string {
 			}
 		}
 		if len(tool.Locked) > 0 {
-			b.WriteString("- locked (Touch ID required - ask user to 'zuko unlock'):\n")
+			b.WriteString("- locked (run normally through shim; zuko serve/local auth/user unlock gates execution):\n")
 			for _, p := range tool.Locked {
 				fmt.Fprintf(&b, "    - %s %s\n", name, strings.Join(p, " "))
 			}

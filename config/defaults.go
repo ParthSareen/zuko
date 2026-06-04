@@ -38,6 +38,21 @@ func DefaultConfig() *Config {
 					// Block mutation methods but allow field flags for graphql queries
 					"api": {"-X", "--method"},
 				},
+				Locked: [][]string{
+					{"issue", "create"},
+					{"issue", "close"},
+					{"issue", "reopen"},
+					{"issue", "edit"},
+					{"pr", "create"},
+					{"pr", "merge"},
+					{"pr", "comment"},
+					{"release", "create"},
+					{"run", "cancel"},
+					{"run", "rerun"},
+					{"workflow", "run"},
+					{"gist", "create"},
+					{"gist", "edit"},
+				},
 			},
 			"git": {
 			AllowAll: true,

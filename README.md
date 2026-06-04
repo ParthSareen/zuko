@@ -1,6 +1,6 @@
 # zuko
 
-Read-only CLI sandbox for AI agents. Wraps tools like `gh` and `git` behind an allowlist so agents can only run non-destructive commands. Dangerous subcommands like `git commit` and `git push` require separate, scoped unlocks via Touch ID.
+Read-only CLI sandbox for AI agents. Wraps tools like `gh` and `git` behind an allowlist so agents can only run non-destructive commands. Dangerous subcommands like `git commit` and `git push` require separate, scoped unlocks via macOS local authentication such as Touch ID, Apple Watch, or password.
 
 Built this because I started writing bash scripts and moving binaries to only let my OpenClaw (called Zuko) have access to only read-only commands for certain tools.
 
@@ -105,7 +105,7 @@ tools:
 
 - **allow_all** — pass everything through except `locked` subcommands. Ideal for tools like `git` where most commands are safe.
 - **allow** — prefix match. `["issue", "list"]` permits `gh issue list --state open -R foo/bar`.
-- **locked** — subcommands gated behind a scoped unlock (Touch ID per operation). Checked before `allow` so a locked subcommand can't accidentally match a broader allow entry.
+- **locked** — subcommands gated behind a scoped unlock (local authentication per operation on macOS). Checked before `allow` so a locked subcommand can't accidentally match a broader allow entry.
 - **deny_flags** — per-subcommand flag blocklist. Blocks `gh api -X POST` while allowing `gh api /repos/...`.
 - **allow_bare** — whether bare invocation (e.g. `gh` with no args) is permitted.
 
@@ -117,7 +117,7 @@ zuko config
 
 ## Authentication
 
-Zuko uses Touch ID on macOS (with fallback to system password dialog) or `sudo` on Linux to gate privileged operations.
+Zuko uses macOS local authentication (preferring Apple Watch/companion auth, then Touch ID or password) or `sudo` on Linux to gate privileged operations.
 
 ### Unlock (run unrestricted commands)
 
@@ -146,7 +146,39 @@ zuko lock git commit
 zuko lock git
 ```
 
-Each unlock requires its own Touch ID prompt. While globally unlocked, all shims pass commands through without filtering. The agent can't run `zuko unlock` because `zuko` itself isn't on the shim PATH.
+Each unlock requires its own local authentication prompt. While globally unlocked, all shims pass commands through without filtering. The agent can't run `zuko unlock` because `zuko` itself isn't on the shim PATH.
+
+### Remote approvals
+
+`zuko serve` lets a paired phone, Apple Watch client, or local app approve locked commands while you are away from the Mac. The approval is one-shot: it applies only to the exact command shown in the request and does not create a timed unlock grant.
+
+For Tailscale-only access:
+
+```bash
+# On the Mac
+zuko serve --tailscale
+
+# In another terminal, pair a client once
+zuko pair "Apple Watch"
+```
+
+`zuko serve --tailscale` binds only to the Mac's Tailscale IPv4 address and writes a local state file for shims at `~/.config/zuko/serve.json`. Paired remote clients use the printed server URL and bearer token to poll:
+
+```bash
+curl -H "Authorization: Bearer <token>" http://100.x.y.z:9777/v1/approvals
+```
+
+When an agent runs a locked command such as `git commit`, the shim posts a request to the local server. A paired client can approve or deny it:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"decision":"approve"}' \
+  http://100.x.y.z:9777/v1/approvals/<id>/decision
+```
+
+If `zuko serve` is not running, unreachable, or times out, zuko falls back to the normal local authentication flow. Denied flags are still manual-only and are never sent for remote approval.
 
 ### Protected operations
 
@@ -158,6 +190,7 @@ These commands require authentication:
 | `zuko unlock <tool>` | Unlock all locked subcommands for a tool |
 | `zuko unlock <tool> <subcmd>` | Unlock a specific subcommand |
 | `zuko config` | Open allowlist config in `$EDITOR` |
+| `zuko pair` | Pair a remote approval client |
 | `zuko init shell` | Prepend shim dir to PATH in shell rc |
 | `zuko init openclaw` | Merge settings into openclaw.json |
 | `zuko add` | Add a new tool |
@@ -204,6 +237,8 @@ The digest re-renders from config on every run, so updates to the allowlist show
 | `zuko add` | Add a new CLI tool to the sandbox (requires auth) |
 | `zuko remove` | Remove a CLI tool from the sandbox (requires auth) |
 | `zuko config` | Edit allowlist config (requires auth) |
+| `zuko serve` | Run the remote approval server |
+| `zuko pair [name]` | Pair a remote approval client (requires auth) |
 | `zuko unlock [tool] [subcmd]` | Temporarily allow commands (requires auth) |
 | `zuko lock [tool] [subcmd]` | Revoke unlock session (global or scoped) |
 | `zuko timeout [minutes]` | Get or set default unlock duration |
@@ -257,4 +292,4 @@ Then register it in `~/.claude/settings.json`:
 
 ## Platforms
 
-macOS and Linux. Authentication uses the native macOS dialog on Darwin and `sudo -v` on Linux.
+macOS and Linux. Authentication uses macOS LocalAuthentication on Darwin and `sudo -v` on Linux.

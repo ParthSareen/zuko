@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,7 +12,10 @@ import (
 	"github.com/ParthSareen/zuko/auth"
 	"github.com/ParthSareen/zuko/config"
 	"github.com/ParthSareen/zuko/log"
+	"github.com/ParthSareen/zuko/remote"
 )
+
+const remoteApprovalTimeout = 2 * time.Minute
 
 func execTool(toolName string, realBinary string, args []string) {
 	argv := append([]string{toolName}, args...)
@@ -65,6 +70,37 @@ func hasUnlockedFlag(unlockedFlags map[string][]string, subcmd string, args []st
 		}
 	}
 	return false
+}
+
+func tryRemoteApproval(toolName string, args []string, scope string) (bool, bool) {
+	req := remote.NewApprovalRequest(toolName, args, scope, remoteApprovalTimeout)
+	ctx, cancel := context.WithDeadline(context.Background(), req.ExpiresAt)
+	defer cancel()
+
+	decision, err := remote.RequestApproval(ctx, req)
+	if err != nil {
+		if errors.Is(err, remote.ErrNoServer) {
+			return false, false
+		}
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "remote_error", Scope: scope, Error: err.Error()})
+		return false, false
+	}
+
+	switch decision {
+	case remote.DecisionApprove:
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "remote_granted", Scope: scope})
+		return true, true
+	case remote.DecisionDeny:
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "remote_denied", Scope: scope})
+		fmt.Fprintf(os.Stderr, "zuko: %s denied by remote approval\n", req.Command)
+		return false, true
+	case remote.DecisionTimeout:
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "remote_timeout", Scope: scope})
+		return false, false
+	default:
+		log.Write(log.Entry{Tool: toolName, Args: args, Action: "remote_error", Scope: scope, Error: "unknown decision: " + string(decision)})
+		return false, false
+	}
 }
 
 func Run(toolName string, args []string) {
@@ -150,6 +186,13 @@ func Run(toolName string, args []string) {
 				execTool(toolName, tool.RealBinary, args)
 				return
 			}
+			if approved, handled := tryRemoteApproval(toolName, args, scope); handled {
+				if approved {
+					execTool(toolName, tool.RealBinary, args)
+					return
+				}
+				os.Exit(1)
+			}
 			log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: scope})
 			reason := toolName + " " + subcmd
 			if err := auth.PromptAndVerifyPassword(reason); err != nil {
@@ -186,6 +229,13 @@ func Run(toolName string, args []string) {
 			unlockCmd := fmt.Sprintf("zuko unlock %s %s", toolName, subcmd)
 			fmt.Fprintf(os.Stderr, "zuko: %s %s requires unlock — run '%s'\n",
 				toolName, subcmd, unlockCmd)
+			os.Exit(1)
+		}
+		if approved, handled := tryRemoteApproval(toolName, args, scope); handled {
+			if approved {
+				execTool(toolName, tool.RealBinary, args)
+				return
+			}
 			os.Exit(1)
 		}
 		log.Write(log.Entry{Tool: toolName, Args: args, Action: "blocked", Scope: scope})

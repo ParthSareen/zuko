@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-const touchIDSwift = `
+const localAuthSwift = `
 import LocalAuthentication
 import Foundation
 
@@ -16,18 +16,32 @@ let reason = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "authenticate to proceed"
 
-let context = LAContext()
-var error: NSError?
+func evaluate(_ policy: LAPolicy, reason: String) -> Bool {
+    let context = LAContext()
+    var error: NSError?
+    guard context.canEvaluatePolicy(policy, error: &error) else {
+        return false
+    }
 
-if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
     let semaphore = DispatchSemaphore(value: 0)
     var success = false
-    context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { result, _ in
+    context.evaluatePolicy(policy, localizedReason: reason) { result, _ in
         success = result
         semaphore.signal()
     }
     semaphore.wait()
-    if success {
+    return success
+}
+
+let policies = [
+    // LAPublicDefines.h: 3 is watch/companion, 4 is biometrics-or-watch/companion.
+    LAPolicy(rawValue: 3),
+    LAPolicy(rawValue: 4),
+    LAPolicy.deviceOwnerAuthentication,
+].compactMap { $0 }
+
+for policy in policies {
+    if evaluate(policy, reason: reason) {
         exit(0)
     }
 }
@@ -49,11 +63,11 @@ func authHelperPath() string {
 	return filepath.Join(home, ".config", "zuko", "zuko-auth")
 }
 
-// buildAuthHelper compiles and codesigns the Touch ID helper binary.
+// buildAuthHelper compiles and codesigns the LocalAuthentication helper binary.
 // It caches the result and only rebuilds if the source changes.
 func buildAuthHelper() (string, error) {
 	helperPath := authHelperPath()
-	srcHash := fmt.Sprintf("%x", sha256.Sum256([]byte(touchIDSwift)))
+	srcHash := fmt.Sprintf("%x", sha256.Sum256([]byte(localAuthSwift)))
 
 	// Check if cached binary is current
 	hashPath := helperPath + ".sha256"
@@ -70,7 +84,7 @@ func buildAuthHelper() (string, error) {
 
 	// Write Swift source to temp file
 	srcPath := helperPath + ".swift"
-	if err := os.WriteFile(srcPath, []byte(touchIDSwift), 0600); err != nil {
+	if err := os.WriteFile(srcPath, []byte(localAuthSwift), 0600); err != nil {
 		return "", err
 	}
 	defer os.Remove(srcPath)
@@ -102,15 +116,16 @@ func buildAuthHelper() (string, error) {
 	return helperPath, nil
 }
 
-// PromptAndVerifyPassword attempts Touch ID first (via compiled helper with
-// biometry entitlement), then falls back to the macOS admin password dialog.
+// PromptAndVerifyPassword attempts Apple Watch/companion auth first, then
+// biometric-or-companion auth, then the password-capable local auth policy. It
+// falls back to the macOS admin password dialog if LocalAuthentication fails.
 func PromptAndVerifyPassword(reason string) error {
 	if reason == "" {
 		reason = "authenticate to proceed"
 	}
 	prompt := "Zuko: " + reason
 
-	// Try Touch ID via compiled, signed helper
+	// Try LocalAuthentication via compiled, signed helper.
 	if helperPath, err := buildAuthHelper(); err == nil {
 		cmd := exec.Command(helperPath, prompt)
 		cmd.Stderr = os.Stderr
